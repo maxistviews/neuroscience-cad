@@ -1,0 +1,182 @@
+<!-- Simulation 1.1 -->
+<html>
+<head>    
+</head>
+<body>
+	<canvas id="sim_canvas" width="900" height="600" style="border:2px solid #000000;">
+	</canvas>
+	
+	<p>Orange ions</p>
+	<div class="slidecontainer">
+	  <input id="orange_ion" type="range" min="0" max="500" value="50" class="slider">
+	</div>
+	
+	<p>Purple ions</p>
+	<div class="slidecontainer">
+	  <input id="purple_ion" type="range" min="0" max="500" value="50" class="slider">
+	</div>
+
+	<p>Ion speed</p>
+	<div class="slidecontainer">
+	  <input id="ion_speed" type="range" min="1" max="1000" value="150" class="slider">
+	</div>
+	
+	<p>Membrane permeability</p>
+	<div class="slidecontainer">
+	  <input id="membrane_permeability" type="range" min="0" max="100" value="0" class="slider">
+	</div>
+	
+	<button onclick="location.reload()">Reset</button>
+	
+	<script>
+
+	var scr_width = 900;
+	var scr_height = 600;
+	var ion_dim = 20;
+
+	var c = document.getElementById("sim_canvas");
+	var ctx = c.getContext("2d");
+	
+	var o_ion = new Image();
+	var p_ion = new Image();
+	
+	var permeability = 0;
+	var old_speed = 1.5;
+	var speed = 1.5;
+
+	var o_num = 500;
+	var o_x = new Array(o_num);
+	var o_y = new Array(o_num);
+	var o_vx = new Array(o_num);
+	var o_vy = new Array(o_num);
+
+	var p_num = 500;
+	var p_x = new Array(p_num);
+	var p_y = new Array(p_num);
+	var p_vx = new Array(p_num);
+	var p_vy = new Array(p_num);
+	
+	var top = 0.0;
+	var left = 0.0;
+	var bottom = scr_height - ion_dim;
+	var right = scr_width - ion_dim;
+	var perm_left = 430.0 - ion_dim;
+	var perm_right = 470.0;
+	
+	
+	function init() {
+		permeability = 0;
+		old_speed = 1.5;
+		speed = 1.5;
+		o_num = 50;
+		p_num = 50;
+		o_ion.src = 'canvas_orange.png';
+		p_ion.src = 'canvas_purple.png';
+		
+		document.getElementById('membrane_permeability').value = 0;
+		document.getElementById('orange_ion').value = o_num;
+		document.getElementById('purple_ion').value = p_num;
+		document.getElementById('ion_speed').value = speed * 100;
+
+		for(let i=0;i<500;i++){
+			var dir = Math.random() * 2.0 * Math.PI;
+			
+			o_x[i] = Math.random() * perm_left;
+			o_y[i] = Math.random() * bottom;
+
+			o_vx[i] = Math.cos(dir) * speed;
+			o_vy[i] = Math.sin(dir) * speed;
+		}
+
+		for(let i=0;i<500;i++){
+			var dir = Math.random() * 2.0 * Math.PI;
+
+			p_x[i] = Math.random() * perm_right + 470;
+			p_y[i] = Math.random() * bottom;
+
+			p_vx[i] = Math.cos(dir) * speed;
+			p_vy[i] = Math.sin(dir) * speed;
+		}
+
+		window.requestAnimationFrame(draw);
+	}
+
+	function draw() {
+		permeability = document.getElementById('membrane_permeability').value / 100;		
+		o_num = document.getElementById('orange_ion').value;
+		p_num = document.getElementById('purple_ion').value;
+		speed = document.getElementById('ion_speed').value / 100;
+
+		var ctx = document.getElementById('sim_canvas').getContext('2d');
+		ctx.globalCompositeOperation = 'destination-over';
+		ctx.clearRect(0, 0, 900, 600); // clear canvas
+
+		for(let i=0;i<o_num;i++){
+			o_vx[i] = o_vx[i] / old_speed * speed;
+			o_vy[i] = o_vy[i] / old_speed * speed;
+
+			if(o_x[i] + o_vx[i] < 0.0 || o_x[i] + o_vx[i] > right){
+				o_vx[i] = o_vx[i] * -1.0;
+			}
+			if(o_y[i] + o_vy[i] < 0.0 || o_y[i] + o_vy[i] > bottom){
+				o_vy[i] = o_vy[i] * -1.0;
+			}
+			if((o_x[i] < perm_left && o_x[i] + o_vx[i] > perm_left || o_x[i] > perm_right && o_x[i] + o_vx[i] < perm_right) && Math.random() > permeability){
+				o_vx[i] = o_vx[i] * -1.0;
+			}
+			o_x[i] += o_vx[i];
+			o_y[i] += o_vy[i];
+			
+			ctx.drawImage(o_ion, o_x[i], o_y[i], ion_dim, ion_dim);
+		}
+
+		for(let i=0;i<p_num;i++){
+			p_vx[i] = p_vx[i] / old_speed * speed;
+			p_vy[i] = p_vy[i] / old_speed * speed;
+
+			if(p_x[i] + p_vx[i] < 0.0 || p_x[i] + p_vx[i] > right){
+				p_vx[i] = p_vx[i] * -1.0;
+			}
+			if(p_y[i] + p_vy[i] < 0.0 || p_y[i] + p_vy[i] > bottom){
+				p_vy[i] = p_vy[i] * -1.0;
+			}
+			if((p_x[i] < perm_left && p_x[i] + p_vx[i] > perm_left || p_x[i] > perm_right && p_x[i] + p_vx[i] < perm_right) && Math.random() > permeability){
+				p_vx[i] = p_vx[i] * -1.0;
+			}
+			p_x[i] += p_vx[i];
+			p_y[i] += p_vy[i];
+			
+			ctx.drawImage(p_ion, p_x[i], p_y[i], ion_dim, ion_dim);
+		}
+
+		old_speed = speed;
+
+		// Draw membrane
+		ctx.beginPath();
+		ctx.lineWidth = "2";
+		ctx.globalAlpha = 1-permeability;
+		ctx.strokeStyle = "slategrey";
+		ctx.rect(430, 0, 40, 600);
+		ctx.stroke();
+		ctx.globalAlpha = 1-permeability;
+		ctx.fillStyle = "slategrey";
+		ctx.fillRect(430, 0, 40, 600);
+		ctx.globalAlpha = 1.0;
+
+		// Draw background
+		var back = ctx.createLinearGradient(0, 0, 900, 0);
+		back.addColorStop(0, "slategrey");
+		back.addColorStop(0.5, "lightgrey");
+		back.addColorStop(1, "slategrey");
+
+		ctx.fillStyle = back;
+		ctx.fillRect(0, 0, 900, 600);
+
+		window.requestAnimationFrame(draw);
+	}
+
+	init();
+	</script>
+</body>
+</html>
+
