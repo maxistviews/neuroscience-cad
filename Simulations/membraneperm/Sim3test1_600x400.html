@@ -1,0 +1,485 @@
+<!-- Simulation 2.0 -->
+<html>
+<head>    
+</head>
+<body>
+	<canvas id="sim_canvas" width="600" height="400" style="border:2px solid #000000;">
+	</canvas>
+<!--
+	<p>Debug</p>
+	<input id="info_x" type="text">
+	<input id="info_y" type="text">
+-->
+	<p>Potassium</p>
+	<div class="slidecontainer">
+	  <input id="orange_ion" type="range" min="0" max="500" value="200" class="slider">
+	  <input id="orange_inside" type="text">
+	  <input id="orange_outside" type="text">
+	</div>
+	
+	<p>Sodium</p>
+	<div class="slidecontainer">
+	  <input id="purple_ion" type="range" min="0" max="500" value="1" class="slider">
+	  <input id="purple_inside" type="text">
+	  <input id="purple_outside" type="text">
+	</div>
+	
+	<p>Potassium permeability</p>
+	<div class="slidecontainer">
+	  <input id="K_permeability" type="range" min="0" max="100" value="0" class="slider">
+	</div>
+	
+	<p>Sodium permeability</p>
+	<div class="slidecontainer">
+	  <input id="Na_permeability" type="range" min="0" max="10" value="0" class="slider">
+	</div>
+	
+	<p>Proteins</p>
+	<div class="slidecontainer">
+	  <input id="proteins" type="range" min="0" max="500" value="200" class="slider">
+	</div>
+
+	<p>Ion speed</p>
+	<div class="slidecontainer">
+	  <input id="ion_speed" type="range" min="1" max="500" value="75" class="slider">
+	</div>
+	
+
+	
+	<button onclick="location.reload()">Reset</button>
+	
+	<script>
+
+	var dampening_maj = 0.2;
+	var dampening_min = 0.4;
+	var scr_width = 600;
+	var scr_height = 400;
+	var cent_x = scr_width/2;
+	var cent_y = scr_height/2;
+	var ion_dim = 14;
+	var p_dim = 20;
+	var membrane_width = 20;
+
+	var c = document.getElementById("sim_canvas");
+	var ctx = c.getContext("2d");
+	
+	var o_ion = new Image();
+	var p_ion = new Image();
+	var protein = new Image();
+	
+	var K_permeability = 0;
+	var Na_permeability = 0;
+	var old_speed = 1.5;
+	var speed = 1.5;
+
+	var total_num = 500;
+	
+	var o_num = total_num;
+	var o_x = new Array(o_num);
+	var o_y = new Array(o_num);
+	var o_vx = new Array(o_num);
+	var o_vy = new Array(o_num);
+	var o_ax = new Array(o_num);
+	var o_ay = new Array(o_num);
+	
+	var p_num = total_num;
+	var p_x = new Array(p_num);
+	var p_y = new Array(p_num);
+	var p_vx = new Array(p_num);
+	var p_vy = new Array(p_num);
+	var p_ax = new Array(p_num);
+	var p_ay = new Array(p_num);
+
+	var pr_num = total_num;
+	var pr_x = new Array(pr_num);
+	var pr_y = new Array(pr_num);
+	var pr_vx = new Array(pr_num);
+	var pr_vy = new Array(pr_num);
+	var pr_ax = new Array(pr_num);
+	var pr_ay = new Array(pr_num);
+
+	var scr_top = 0 + ion_dim * 0.5;
+	var scr_left = 0 + ion_dim * 0.5;
+	var scr_bottom = scr_height - ion_dim * 0.5;
+	var scr_right = scr_width - ion_dim * 0.5;
+	var cell_d = 300;
+	var perm_scr_left = cell_d * 0.5;
+	var perm_scr_right = perm_scr_left + cell_d - ion_dim;
+	var perm_scr_top = (scr_height-cell_d) * 0.5;
+	var perm_scr_bottom = perm_scr_top + cell_d - ion_dim;
+	
+	var spd = 0;
+	var unit = 0;
+	
+	function init() {
+		K_permeability = 0;
+		Na_permeability = 0;
+		old_speed = 1.5;
+		speed = 0.75;
+		max_speed = 7;
+		o_num = 100;
+		p_num = 100;
+		pr_num = 100;
+		o_ion.src = 'canvas_orange.png';
+		p_ion.src = 'canvas_purple.png';
+		protein.src = 'canvas_protein.png';
+		
+		document.getElementById('K_permeability').value = 0;
+		document.getElementById('Na_permeability').value = 0;
+		document.getElementById('orange_ion').value = o_num;
+		document.getElementById('purple_ion').value = p_num;
+		document.getElementById('proteins').value = pr_num;
+		document.getElementById('ion_speed').value = speed * 100;
+
+		for(let i=0;i<total_num;i++){
+			var dir = Math.random() * 2.0 * Math.PI;
+			
+			while(true){
+				o_x[i] = perm_scr_left + Math.random() * (cell_d - ion_dim);
+				o_y[i] = perm_scr_top  + Math.random() * (cell_d - ion_dim);
+				
+				if((cent_x - o_x[i]) * (cent_x - o_x[i]) + (cent_y - o_y[i]) * (cent_y - o_y[i]) < cell_d/2 * cell_d/2)
+					break;
+			}
+
+			o_vx[i] = Math.cos(dir) * speed;
+			o_vy[i] = Math.sin(dir) * speed;
+		}
+		
+		
+		for(let i=0;i<total_num;i++){
+			var dir = Math.random() * 2.0 * Math.PI;
+			
+			while(true){
+				p_x[i] = Math.random() * scr_width;
+				p_y[i] = Math.random() * scr_height;
+				
+				if((cent_x - p_x[i]) * (cent_x - p_x[i]) + (cent_y - p_y[i]) * (cent_y - p_y[i]) > (cell_d/2 + membrane_width + ion_dim) * (cell_d/2 + membrane_width + ion_dim))
+					break;
+			}
+
+			p_vx[i] = Math.cos(dir) * speed;
+			p_vy[i] = Math.sin(dir) * speed;
+		}
+
+		for(let i=0;i<total_num;i++){
+			var dir = Math.random() * 2.0 * Math.PI;
+			
+			while(true){
+				pr_x[i] = perm_scr_left + Math.random() * (cell_d - p_dim);
+				pr_y[i] = perm_scr_top  + Math.random() * (cell_d - p_dim);
+				
+				if((cent_x - pr_x[i]) * (cent_x - pr_x[i]) + (cent_y - pr_y[i]) * (cent_y - pr_y[i]) < cell_d/2 * cell_d/2)
+					break;
+			}
+
+			pr_vx[i] = Math.cos(dir) * speed * 0.1;
+			pr_vy[i] = Math.sin(dir) * speed * 0.1;
+		}
+
+		window.requestAnimationFrame(draw);
+	}
+
+	function draw() {
+		var o_inside = 0;
+		var o_outside = 0;
+		var p_inside = 0;
+		var p_outside = 0;
+		
+		K_permeability = document.getElementById('K_permeability').value / 100;	
+		Na_permeability = document.getElementById('Na_permeability').value / 100;			
+		o_num = document.getElementById('orange_ion').value;
+		p_num = document.getElementById('purple_ion').value;
+		pr_num = document.getElementById('proteins').value;
+		speed = document.getElementById('ion_speed').value / 100;
+
+		var ctx = document.getElementById('sim_canvas').getContext('2d');
+		ctx.globalCompositeOperation = 'destination-over';
+		ctx.clearRect(0, 0, scr_width, scr_height); // clear canvas
+
+		for(let i=0;i<total_num;i++){
+			o_ax[i] = 0;
+			o_ay[i] = 0;
+			p_ax[i] = 0;
+			p_ay[i] = 0;
+			pr_ax[i] = 0;
+			pr_ay[i] = 0;
+		}
+		
+// orange guys
+		for(let i=0;i<o_num;i++){
+			for(let j=i+1;j<o_num;j++){
+				var distSq = (o_x[i] - o_x[j]) * (o_x[i] - o_x[j]) + (o_y[i] - o_y[j]) * (o_y[i] - o_y[j]);
+				var F = 10.0 / distSq;
+				var dist = Math.sqrt(distSq);
+				
+				var dx = (o_x[i] - o_x[j]) / dist * F;
+				var dy = (o_y[i] - o_y[j]) / dist * F;
+				
+				o_ax[i] += dx;
+				o_ay[i] += dy;
+				o_ax[j] -= dx;
+				o_ay[j] -= dy;
+			}
+			for(let j=0;j<p_num;j++){
+				var distSq = (o_x[i] - p_x[j]) * (o_x[i] - p_x[j]) + (o_y[i] - p_y[j]) * (o_y[i] - p_y[j]);
+				var F = 10.0 / distSq;
+				var dist = Math.sqrt(distSq);
+				
+				var dx = (o_x[i] - p_x[j]) / dist * F;
+				var dy = (o_y[i] - p_y[j]) / dist * F;
+				
+				o_ax[i] += dx;
+				o_ay[i] += dy;
+				p_ax[j] -= dx;
+				p_ay[j] -= dy;
+			}
+			for(let j=0;j<pr_num;j++){
+				var distSq = (o_x[i] - pr_x[j]) * (o_x[i] - pr_x[j]) + (o_y[i] - pr_y[j]) * (o_y[i] - pr_y[j]);
+				var F = 10.0 / distSq;
+				var dist = Math.sqrt(distSq);
+				
+				var dx = (o_x[i] - pr_x[j]) / dist * F;
+				var dy = (o_y[i] - pr_y[j]) / dist * F;
+				
+				o_ax[i] -= dx ;
+				o_ay[i] -= dy ;
+				pr_ax[j] += dx / 1000;
+				pr_ay[j] += dy / 1000;
+			}
+			
+			o_vx[i] += o_ax[i];
+			o_vy[i] += o_ay[i];
+			
+			o_vx[i] = o_vx[i] / old_speed * speed;
+			o_vy[i] = o_vy[i] / old_speed * speed;
+
+			spd = o_vx[i] * o_vx[i] + o_vy[i] * o_vy[i];
+			if(spd > max_speed * max_speed){
+				unit = Math.sqrt(spd) * max_speed;
+				o_vx[i] = o_vx[i] / unit;
+				o_vy[i] = o_vy[i] / unit;
+			}
+
+			if(o_x[i] + o_vx[i] < scr_left){
+				o_x[i] += scr_width - ion_dim;
+			} else if(o_x[i] + o_vx[i] > scr_right){
+				o_x[i] -= scr_width - ion_dim;
+			}
+			if(o_y[i] + o_vy[i] < scr_top){
+				o_y[i] += scr_height - ion_dim;
+			} else if(o_y[i] + o_vy[i] > scr_bottom){
+				o_y[i] -= scr_height - ion_dim;
+			}
+			
+			if(		(cent_x - o_x[i]) * (cent_x - o_x[i]) + (cent_y - o_y[i]) * (cent_y - o_y[i]) < cell_d/2 * cell_d/2){
+				o_inside += 1;
+				if(		(cent_x - (o_x[i] + o_vx[i])) * (cent_x - (o_x[i] + o_vx[i])) + (cent_y - (o_y[i] + o_vy[i])) * (cent_y - (o_y[i] + o_vy[i])) >= cell_d/2 * cell_d/2 &&
+						Math.random() >= K_permeability){
+					o_vx[i] = o_vx[i] * -dampening_min;
+					o_vy[i] = o_vy[i] * -dampening_min;
+				}
+			} else if(		(cent_x - o_x[i]) * (cent_x - o_x[i]) + (cent_y - o_y[i]) * (cent_y - o_y[i]) > (cell_d/2 + membrane_width + ion_dim) * (cell_d/2 + membrane_width + ion_dim) &&
+						Math.random() >= K_permeability){
+				o_outside += 1;
+				if(		(cent_x - (o_x[i] + o_vx[i])) * (cent_x - (o_x[i] + o_vx[i])) + (cent_y - (o_y[i] + o_vy[i])) * (cent_y - (o_y[i] + o_vy[i])) <= (cell_d/2 + membrane_width + ion_dim) * (cell_d/2 + membrane_width + ion_dim)){
+					o_vx[i] = o_vx[i] * -dampening_min;
+					o_vy[i] = o_vy[i] * -dampening_min;
+				}
+			}
+
+			o_x[i] += o_vx[i];
+			o_y[i] += o_vy[i];
+			
+			ctx.drawImage(o_ion, o_x[i] - ion_dim * 0.5, o_y[i] - ion_dim * 0.5, ion_dim, ion_dim);
+		}
+	
+// purple guys
+		for(let i=0;i<p_num;i++){
+			for(let j=i+1;j<p_num;j++){
+				var distSq = (p_x[i] - p_x[j]) * (p_x[i] - p_x[j]) + (p_y[i] - p_y[j]) * (p_y[i] - p_y[j]);
+				var F = 10.0 / distSq;
+				var dist = Math.sqrt(distSq);
+				
+				var dx = (p_x[i] - p_x[j]) / dist * F;
+				var dy = (p_y[i] - p_y[j]) / dist * F;
+				
+				p_ax[i] += dx;
+				p_ay[i] += dy;
+				p_ax[j] -= dx;
+				p_ay[j] -= dy;
+			}
+
+			for(let j=0;j<pr_num;j++){
+				var distSq = (p_x[i] - pr_x[j]) * (p_x[i] - pr_x[j]) + (p_y[i] - pr_y[j]) * (p_y[i] - pr_y[j]);
+				var F = 10.0 / distSq;
+				var dist = Math.sqrt(distSq);
+				
+				var dx = (p_x[i] - pr_x[j]) / dist * F;
+				var dy = (p_y[i] - pr_y[j]) / dist * F;
+				
+				p_ax[i] -= dx ;
+				p_ay[i] -= dy ;
+				pr_ax[j] += dx / 1000;
+				pr_ay[j] += dy / 1000;
+			}
+
+			p_vx[i] += p_ax[i];
+			p_vy[i] += p_ay[i];
+			
+			p_vx[i] = p_vx[i] / old_speed * speed;
+			p_vy[i] = p_vy[i] / old_speed * speed;
+
+			spd = p_vx[i] * p_vx[i] + p_vy[i] * p_vy[i];
+			if(spd > max_speed * max_speed){
+				unit = Math.sqrt(spd) * max_speed;
+				p_vx[i] = p_vx[i] / unit;
+				p_vy[i] = p_vy[i] / unit;
+			}
+
+			if(p_x[i] + p_vx[i] < scr_left){
+				p_x[i] += scr_width - ion_dim;
+			} else if(p_x[i] + p_vx[i] > scr_right){
+				p_x[i] -= scr_width - ion_dim;
+			}
+
+			if(p_y[i] + p_vy[i] < scr_top){
+				p_y[i] += scr_height - ion_dim;
+			} else if(p_y[i] + p_vy[i] > scr_bottom){
+				p_y[i] -= scr_height - ion_dim;
+			}
+
+			if(		(cent_x - p_x[i]) * (cent_x - p_x[i]) + (cent_y - p_y[i]) * (cent_y - p_y[i]) < cell_d/2 * cell_d/2){
+				p_inside += 1;
+				if(		(cent_x - (p_x[i] + p_vx[i])) * (cent_x - (p_x[i] + p_vx[i])) + (cent_y - (p_y[i] + p_vy[i])) * (cent_y - (p_y[i] + p_vy[i])) >= cell_d/2 * cell_d/2 &&
+						Math.random() >= Na_permeability){
+					p_vx[i] = p_vx[i] * -dampening_min;
+					p_vy[i] = p_vy[i] * -dampening_min;
+				}
+			} else if(		(cent_x - p_x[i]) * (cent_x - p_x[i]) + (cent_y - p_y[i]) * (cent_y - p_y[i]) > (cell_d/2 + membrane_width + ion_dim) * (cell_d/2 + membrane_width + ion_dim)){
+				p_outside += 1;
+				if(		(cent_x - (p_x[i] + p_vx[i])) * (cent_x - (p_x[i] + p_vx[i])) + (cent_y - (p_y[i] + p_vy[i])) * (cent_y - (p_y[i] + p_vy[i])) <= (cell_d/2 + membrane_width + ion_dim) * (cell_d/2 + membrane_width + ion_dim) &&
+						Math.random() >= Na_permeability){
+					p_vx[i] = p_vx[i] * -dampening_min;
+					p_vy[i] = p_vy[i] * -dampening_min;
+				}
+			}
+
+			p_x[i] += p_vx[i];
+			p_y[i] += p_vy[i];
+			
+			ctx.drawImage(p_ion, p_x[i] - ion_dim * 0.5, p_y[i] - ion_dim * 0.5, ion_dim, ion_dim);
+		}		
+// proteins
+		for(let i=0;i<pr_num;i++){
+			for(let j=i+1;j<pr_num;j++){
+				var distSq = (pr_x[i] - pr_x[j]) * (pr_x[i] - pr_x[j]) + (pr_y[i] - pr_y[j]) * (pr_y[i] - pr_y[j]);
+				var F = 10.0 / distSq;
+				var dist = Math.sqrt(distSq);
+				
+				var dx = (pr_x[i] - pr_x[j]) / dist * F;
+				var dy = (pr_y[i] - pr_y[j]) / dist * F;
+				
+				pr_ax[i] += dx;
+				pr_ay[i] += dy;
+				pr_ax[j] -= dx;
+				pr_ay[j] -= dy;
+			}
+			pr_vx[i] += pr_ax[i];
+			pr_vy[i] += pr_ay[i];
+			
+			pr_vx[i] = pr_vx[i] / old_speed * speed;
+			pr_vy[i] = pr_vy[i] / old_speed * speed;
+
+			spd = pr_vx[i] * pr_vx[i] + pr_vy[i] * pr_vy[i];
+			if(spd > max_speed * max_speed){
+				unit = Math.sqrt(spd) * max_speed;
+				pr_vx[i] = pr_vx[i] / unit;
+				pr_vy[i] = pr_vy[i] / unit;
+			}
+
+			if(pr_x[i] + pr_vx[i] < scr_left){
+				pr_x[i] += scr_width - p_dim;
+			} else if(pr_x[i] + pr_vx[i] > scr_right){
+				pr_x[i] -= scr_width - p_dim;
+			}
+			if(pr_y[i] + pr_vy[i] < 0.0){
+				pr_y[i] += scr_height - p_dim;
+			} else if(pr_y[i] + pr_vy[i] > scr_bottom){
+				pr_y[i] -= scr_height - p_dim;
+			}
+			
+			if(		(cent_x - pr_x[i]) * (cent_x - pr_x[i]) + (cent_y - pr_y[i]) * (cent_y - pr_y[i]) < cell_d/2 * cell_d/2 &&
+					(cent_x - (pr_x[i] + pr_vx[i])) * (cent_x - (pr_x[i] + pr_vx[i])) + (cent_y - (pr_y[i] + pr_vy[i])) * (cent_y - (pr_y[i] + pr_vy[i])) >= cell_d/2 * cell_d/2){
+
+				if(pr_vx[i] * pr_vx[i] + pr_vy[i] * pr_vy[i] > 100.0){
+					pr_vx[i] = pr_vx[i] * -dampening_maj;
+					pr_vy[i] = pr_vy[i] * -dampening_maj;
+				} else {
+					pr_vx[i] = pr_vx[i] * -dampening_min;
+					pr_vy[i] = pr_vy[i] * -dampening_min;
+				}
+			}
+
+			pr_x[i] += pr_vx[i];
+			pr_y[i] += pr_vy[i];
+			
+			ctx.drawImage(protein, pr_x[i] - p_dim * 0.5, pr_y[i] - p_dim * 0.5, p_dim, p_dim);
+		}
+
+		old_speed = speed;
+		Na_permeability = document.getElementById('Na_permeability').value 
+		K_permeability = document.getElementById('K_permeability').value 
+		// Draw cell
+
+		//ctx.globalAlpha = 1-K_permeability/10;
+		ctx.beginPath();
+		ctx.fillStyle = "white";
+		ctx.arc(cent_x, cent_y, cell_d/2 + membrane_width/4, 0, 2 * Math.PI);
+		ctx.fill();
+
+		// Draw membrane 1
+		ctx.globalAlpha = 1-K_permeability/100;
+		ctx.beginPath();
+		ctx.lineWidth = membrane_width/2;
+		ctx.strokeStyle = "slategrey";
+		ctx.arc(cent_x, cent_y, cell_d/2 + membrane_width/2, 0, 2 * Math.PI);
+		ctx.stroke();
+
+		
+		// Draw membrane 2
+		ctx.globalAlpha = 1-Na_permeability/12;
+		ctx.beginPath();
+		ctx.lineWidth = membrane_width/2;
+		ctx.strokeStyle = "darkslategrey";
+		ctx.arc(cent_x, cent_y, cell_d/2 + membrane_width, 0, 2 * Math.PI);
+		ctx.stroke();
+
+		// Draw background
+		ctx.globalAlpha = 0.8;
+		var back = ctx.createLinearGradient(0, 0, scr_width, 0);
+		back.addColorStop(0, "slategrey");
+		back.addColorStop(0.5, "lightgrey");
+		back.addColorStop(1, "slategrey");
+
+		ctx.fillStyle = back;
+		ctx.fillRect(0, 0, scr_width, scr_height);
+		
+		ctx.globalAlpha = 1;
+		document.getElementById('orange_inside').value = o_inside;
+		document.getElementById('orange_outside').value = o_outside;
+		document.getElementById('purple_inside').value = p_inside;
+		document.getElementById('purple_outside').value = p_outside;
+		
+//		document.getElementById('info_x').value = p_x[0];
+//		document.getElementById('info_y').value = p_y[0];
+		
+		window.requestAnimationFrame(draw);
+	}
+
+	init();
+	</script>
+</body>
+</html>
+
+
